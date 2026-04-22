@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LOVJ Deck — M1 smoke test</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 900px; color: #ddd; background: #1a1a1e; }
+  h1 { font-weight: 500; margin-bottom: 0.25rem; }
+  h2 { font-weight: 500; font-size: 1rem; margin-top: 1.5rem; color: #aaa; }
+  .row { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; flex-wrap: wrap; }
+  input[type=text], input[type=number], select { padding: 0.4rem; background: #2a2a30; color: #ddd; border: 1px solid #444; border-radius: 3px; font-family: inherit; }
+  input#msg { flex: 1; min-width: 240px; }
+  select { min-width: 10rem; }
+  button { padding: 0.4rem 0.9rem; background: #333; color: #ddd; border: 1px solid #555; border-radius: 3px; cursor: pointer; font-family: inherit; }
+  button:hover { background: #444; }
+  .preset { background: #243; }
+  .preset:hover { background: #354; }
+  #log { margin-top: 1rem; background: #111; border: 1px solid #333; border-radius: 3px; padding: 0.75rem; height: 18rem; overflow-y: auto; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.82rem; white-space: pre-wrap; }
+  .sent { color: #8cf; }
+  .recv { color: #8fa; }
+  .sys  { color: #fa8; }
+  .err  { color: #f88; }
+  .status { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 50%; margin-right: 0.4rem; vertical-align: middle; }
+  .status.up   { background: #4a8; }
+  .status.down { background: #a44; }
+  label { color: #aaa; font-size: 0.9rem; }
+  .slider-row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.3rem; }
+  .slider-row input[type=range] { flex: 1; }
+  .slider-val { width: 4rem; text-align: right; font-family: monospace; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<h1>LOVJ Deck — M1 smoke test</h1>
+<p><span id="statusDot" class="status down"></span><span id="statusText">Connecting…</span></p>
+
+<h2>Query</h2>
+<div class="row">
+  <button class="preset" onclick='doHello()'>hello</button>
+  <button class="preset" onclick='doListSlots()'>listSlots</button>
+  <label>slot <input id="slot" type="number" value="1" min="1" max="12" style="width:4rem"></label>
+  <button class="preset" onclick='doGetSchema()'>getSchema</button>
+</div>
+
+<h2>Set parameter</h2>
+<div class="row">
+  <label>param
+    <select id="pname"><option value="">— click getSchema first —</option></select>
+  </label>
+</div>
+<div class="slider-row">
+  <input id="pslider" type="range" min="0" max="1" step="0.01" value="0.5"
+         oninput="doSetParamFromSlider(this.value)">
+  <span class="slider-val" id="psliderVal">0.50</span>
+  <button class="preset" onclick="doSetParamFromSlider(document.getElementById('pslider').value)">set</button>
+</div>
+
+<h2>Raw send</h2>
+<div class="row">
+  <input id="msg" type="text" placeholder='type JSON and hit Send' value='{"type":"hello"}'>
+  <button id="send">Send</button>
+</div>
+
+<div id="log"></div>
+
+<script>
+  const logEl = document.getElementById("log");
+  const statusDot = document.getElementById("statusDot");
+  const statusText = document.getElementById("statusText");
+  const pnameEl = document.getElementById("pname");
+  const psliderEl = document.getElementById("pslider");
+  const psliderValEl = document.getElementById("psliderVal");
+
+  let currentParams = [];  // [{name, value, paramId, type}, ...]
+
+  function line(cls, text) {
+    const el = document.createElement("div");
+    el.className = cls;
+    el.textContent = text;
+    logEl.appendChild(el);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function setStatus(up, text) {
+    statusDot.className = "status " + (up ? "up" : "down");
+    statusText.textContent = text;
+  }
+  function sendRaw(raw) {
+    if (ws && ws.readyState === 1) { ws.send(raw); line("sent", ">> " + raw); }
+    else line("err", "not connected");
+  }
+  function sendObj(obj) { sendRaw(JSON.stringify(obj)); }
+
+  // ---- Presets ----
+  function getSlot() { return Number(document.getElementById("slot").value); }
+  function doHello()     { sendObj({type: "hello"}); }
+  function doListSlots() { sendObj({type: "listSlots"}); }
+  function doGetSchema() { sendObj({type: "getSchema", slot: getSlot()}); }
+
+  function doSetParamFromSlider(val) {
+    val = Number(val);
+    psliderValEl.textContent = val.toFixed(2);
+    const name = pnameEl.value;
+    if (!name) { line("err", "select a parameter first"); return; }
+    sendObj({type: "setParam", slot: getSlot(), name: name, value: val});
+  }
+
+  // When the user picks a different param in the dropdown, update the
+  // slider to show that param's current value.
+  pnameEl.addEventListener("change", () => {
+    const p = currentParams.find(x => x.name === pnameEl.value);
+    if (p && typeof p.value === "number") {
+      psliderEl.value = p.value;
+      psliderValEl.textContent = Number(p.value).toFixed(2);
+    }
+  });
+
+  // Populate the dropdown when we get a schema response.
+  function handleSchema(obj) {
+    currentParams = obj.params || [];
+    pnameEl.innerHTML = "";
+    if (currentParams.length === 0) {
+      pnameEl.innerHTML = '<option value="">— no named params —</option>';
+      return;
+    }
+    for (const p of currentParams) {
+      const opt = document.createElement("option");
+      opt.value = p.name;
+      opt.textContent = p.name + " = " + (typeof p.value === "number" ? p.value.toFixed(3) : p.value);
+      pnameEl.appendChild(opt);
+    }
+    // Select first and sync slider.
+    pnameEl.value = currentParams[0].name;
+    pnameEl.dispatchEvent(new Event("change"));
+  }
+
+  // Update the dropdown value when a paramChanged broadcast arrives.
+  function handleParamChanged(obj) {
+    const p = currentParams.find(x => x.name === obj.name);
+    if (p) p.value = obj.value;
+    // If it's the currently selected param, update slider.
+    if (pnameEl.value === obj.name && typeof obj.value === "number") {
+      psliderEl.value = obj.value;
+      psliderValEl.textContent = Number(obj.value).toFixed(2);
+    }
+    // Update the label in the dropdown.
+    for (const opt of pnameEl.options) {
+      if (opt.value === obj.name) {
+        opt.textContent = obj.name + " = " + (typeof obj.value === "number" ? obj.value.toFixed(3) : obj.value);
+      }
+    }
+  }
+
+  // ---- WebSocket ----
+  const WS_URL = "ws://" + location.hostname + ":8765";
+  let ws;
+  function connect() {
+    line("sys", "connecting to " + WS_URL);
+    ws = new WebSocket(WS_URL);
+    ws.onopen = () => {
+      setStatus(true, "connected: " + WS_URL);
+      line("sys", "open");
+      // Auto-hello + auto-schema on connect.
+      sendObj({type: "hello"});
+      sendObj({type: "getSchema", slot: getSlot()});
+    };
+    ws.onmessage = (e) => {
+      try {
+        const obj = JSON.parse(e.data);
+        line("recv", "<< " + JSON.stringify(obj, null, 2));
+        if (obj.type === "schema")       handleSchema(obj);
+        if (obj.type === "paramChanged") handleParamChanged(obj);
+      } catch {
+        line("recv", "<< " + e.data);
+      }
+    };
+    ws.onerror = () => line("err", "socket error");
+    ws.onclose = (e) => {
+      setStatus(false, "disconnected (code " + e.code + ") — retrying in 2s");
+      line("sys", "closed code=" + e.code);
+      setTimeout(connect, 2000);
+    };
+  }
+  connect();
+
+  document.getElementById("send").onclick = () => sendRaw(document.getElementById("msg").value);
+  document.getElementById("msg").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("send").click();
+  });
+
+  // Re-fetch schema when slot input changes.
+  document.getElementById("slot").addEventListener("change", doGetSchema);
+</script>
+</body>
+</html>
