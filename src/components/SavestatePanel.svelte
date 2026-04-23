@@ -11,7 +11,7 @@
 
   let morphEnabled = true;
   let morphTime = 500;
-  let morphEasing = "sineInOut";
+  let morphEasing = "smoothstep";
 
   on("morphSettings", (msg) => {
     if (msg.enabled != null) morphEnabled = msg.enabled;

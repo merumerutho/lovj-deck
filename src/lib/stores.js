@@ -51,3 +51,12 @@ export const beatPhase = writable(0);
 
 /** Live sequencer step positions: { channelName: stepNumber (1-based) }. Updated at ~30Hz. */
 export const seqSteps = writable({});
+
+/** Musical tempo divisions from the backend: [{label, beats}, ...]. */
+export const tempoDivisions = writable([]);
+
+/** Default creation configs per modulator type from backend: { lfo: {...}, envelope: {...} }. */
+export const modulatorDefaults = writable({});
+
+/** Per-field range constraints per modulator type from backend: { lfo: {...}, envelope: {...} }. */
+export const modulatorConstraints = writable({});

@@ -1,8 +1,13 @@
 <script>
   import { tick } from "svelte";
-  import { sequencer, schema, selectedSlot, easingNames, seqSteps, slotShaders } from "../lib/stores.js";
+  import { sequencer, schema, selectedSlot, easingNames, seqSteps, slotShaders, tempoDivisions } from "../lib/stores.js";
   import { send } from "../lib/transport.js";
   import { anchorPoint, clampToViewport } from "../lib/ctxPosition.js";
+
+  $: DIVIDER_OPTIONS = $tempoDivisions
+    .filter((d) => d.beats <= 4)
+    .map((d) => ({ label: d.label, value: 1 / d.beats }))
+    .sort((a, b) => a.value - b.value);
 
   $: patchParams = ($schema && $schema.params || []).map((p) => ({ name: p.name, resource: "parameters", min: p.min, max: p.max }));
   $: shaderParams = ($slotShaders && $slotShaders.shaderParams || []).map((p) => ({ name: p.name, resource: "shaderext", min: p.min ?? 0, max: p.max ?? 1 }));
@@ -82,7 +87,7 @@
     if (stepData && stepData.morphDuration) {
       msg.morphDuration = stepData.morphDuration;
       msg.morphMode = stepData.morphMode || "beats";
-      msg.morphEasing = stepData.morphEasing || "linear";
+      msg.morphEasing = stepData.morphEasing || "smoothstep";
     }
     send(msg);
   }
@@ -156,7 +161,7 @@
     const meta = getParamMeta(chName);
     const stepData = ch.steps[stepIdx - 1];
     const val = hasValue(stepData) ? stepData.value : denormalize(0.5, meta.min, meta.max);
-    const easing = (stepData && stepData.morphEasing) || "linear";
+    const easing = (stepData && stepData.morphEasing) || "smoothstep";
     const morphDuration = (stepData && stepData.morphDuration) || 0;
     // Note: morphDuration is stored in the unit of morphMode (ms for "time", beats for "beats")
     ctxMenu = { chName, stepIdx, meta, val, easing, morphDuration, locked: hasValue(stepData) };
@@ -210,7 +215,7 @@
       value: stepData.value,
       morphDuration: dur,
       morphMode: "time",
-      morphEasing: stepData.morphEasing || "linear",
+      morphEasing: stepData.morphEasing || "smoothstep",
     });
   }
 
@@ -262,19 +267,12 @@
     return map[name] || name.slice(0, 3).toUpperCase();
   }
 
-  const DIVIDER_OPTIONS = [
-    { label: "1/1", value: 0.25 },
-    { label: "1/2", value: 0.5 },
-    { label: "1/4", value: 1 },
-    { label: "1/8", value: 2 },
-    { label: "1/16", value: 4 },
-    { label: "1/32", value: 8 },
-  ];
-
   function dividerLabel(val) {
-    const d = DIVIDER_OPTIONS.find((o) => o.value === val);
+    const d = DIVIDER_OPTIONS.find((o) => Math.abs(o.value - val) < 1e-6);
     return d ? d.label : String(val);
   }
+
+  function resync() { send({ type: "resyncPhases" }); }
 </script>
 
 <svelte:document onclick={(e) => { if (ctxMenu && !e.target.closest(".ctx-menu")) dismissCtx(); }}
@@ -285,6 +283,7 @@
     <button class="tbtn" class:active={playing} onclick={playing ? stop : play}>
       {playing ? "STOP" : "PLAY"}
     </button>
+    <button class="tbtn" onclick={resync}>RESYNC</button>
   </div>
 
   <div class="seq-body">
@@ -345,6 +344,12 @@
                 onchange={(e) => updateChannel(ch.name, "steps", Math.max(1, Math.min(64, Math.round(Number(e.target.value)))))} />
             </label>
             <span class="div-label">RATE {dividerLabel(ch.divider)}</span>
+            <label class="phase-input">
+              PHASE
+              <input type="range" min="0" max="1" step="0.01" value={ch.phase || 0}
+                oninput={(e) => updateChannel(ch.name, "phase", e.target.value)} />
+              <span class="phase-val">{((ch.phase || 0) * 100).toFixed(0)}%</span>
+            </label>
             {#if playing}
               <span class="play-status">
                 <span class="play-dot"></span>
@@ -376,7 +381,7 @@
                   {@const norm = locked ? normalize(stepData.value, meta.min, meta.max) : 0}
                   {@const barH = Math.max(2, Math.round(norm * 100))}
                   {@const isHead = ($seqSteps[ch.name] || ch.currentStep) === i + 1 && playing}
-                  {@const easing = (stepData && stepData.morphEasing) || "linear"}
+                  {@const easing = (stepData && stepData.morphEasing) || "smoothstep"}
                   <div class="step" class:on={locked} class:playhead={isHead}
                     onmousedown={(e) => { if (e.button === 0) onStepDrag(e, ch.name, i + 1, ch); }}
                     oncontextmenu={(e) => showStepCtx(e, ch.name, i + 1, ch)}>
@@ -523,6 +528,12 @@
     border: 1px solid #444; font-family: inherit; font-size: 10px; text-align: center;
   }
   .div-label { color: #666; font-size: 9px; letter-spacing: .15em; }
+  .phase-input {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 9px; color: #888; letter-spacing: .1em;
+  }
+  .phase-input input[type="range"] { width: 60px; accent-color: #c9a24a; cursor: pointer; }
+  .phase-val { color: #666; font-size: 9px; min-width: 28px; }
   .play-status { display: flex; align-items: center; gap: 4px; color: #5a9a6a; }
   .play-dot {
     width: 6px; height: 6px; background: #5a9a6a; border-radius: 50%;

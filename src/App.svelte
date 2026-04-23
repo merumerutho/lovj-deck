@@ -4,7 +4,8 @@
   import {
     slots, selectedSlot, schema, modulators, lfoShapes, easingNames,
     sequencer, sceneSequencer, availablePatches, slotShaders, savestateList,
-    liveValues, liveShaderValues, beatPhase, seqSteps,
+    liveValues, liveShaderValues, beatPhase, seqSteps, tempoDivisions,
+    modulatorDefaults, modulatorConstraints,
   } from "./lib/stores.js";
   import AppHeader from "./components/AppHeader.svelte";
   import SlotSelector from "./components/SlotSelector.svelte";
@@ -17,8 +18,16 @@
 
   let activeTab = "params";
 
-  let projectBpm = 128;
+  let projectBpm = 120;
   let fetchInFlight = false;
+
+  function applyModList(msg) {
+    modulators.set(msg.modulators || []);
+    if (msg.shapes) lfoShapes.set(msg.shapes);
+    if (msg.easingNames) easingNames.set(msg.easingNames);
+    if (msg.typeDefaults) modulatorDefaults.set(msg.typeDefaults);
+    if (msg.typeConstraints) modulatorConstraints.set(msg.typeConstraints);
+  }
 
   async function fetchAll() {
     if (fetchInFlight) return;
@@ -33,9 +42,7 @@
       ]);
       slots.set(slotsRes.slots || []);
       if (slotsRes.selected) selectedSlot.set(slotsRes.selected);
-      modulators.set(modsRes.modulators || []);
-      if (modsRes.shapes) lfoShapes.set(modsRes.shapes);
-      if (modsRes.easingNames) easingNames.set(modsRes.easingNames);
+      applyModList(modsRes);
       sequencer.set(seqRes);
       sceneSequencer.set(sceneSeqRes);
       if (seqRes.bpm) projectBpm = Math.round(seqRes.bpm);
@@ -67,7 +74,10 @@
     }
   }
 
-  on("welcome", () => { fetchAll(); });
+  on("welcome", (msg) => {
+    if (msg.bpm) projectBpm = Math.round(msg.bpm);
+    fetchAll();
+  });
 
   let prevSlot = 1;
   selectedSlot.subscribe((s) => {
@@ -104,9 +114,7 @@
   });
 
   on("modulatorList", (msg) => {
-    modulators.set(msg.modulators || []);
-    if (msg.shapes) lfoShapes.set(msg.shapes);
-    if (msg.easingNames) easingNames.set(msg.easingNames);
+    applyModList(msg);
 
     const mods = msg.modulators || [];
     const paramModSet = new Set(
@@ -143,6 +151,7 @@
   on("sequencerState", (msg) => {
     sequencer.set(msg);
     if (msg.bpm) projectBpm = Math.round(msg.bpm);
+    if (msg.tempoDivisions) tempoDivisions.set(msg.tempoDivisions);
   });
 
   on("sceneSequencerState", (msg) => {
@@ -168,9 +177,7 @@
       request({ type: "getSceneSequencer" }),
       request({ type: "listSlots" }).then((r) => slots.set(r.slots || [])),
     ]);
-    modulators.set(modsRes.modulators || []);
-    if (modsRes.shapes) lfoShapes.set(modsRes.shapes);
-    if (modsRes.easingNames) easingNames.set(modsRes.easingNames);
+    applyModList(modsRes);
     sequencer.set(seqRes);
     sceneSequencer.set(sceneSeqRes);
     await fetchSlotData($selectedSlot);
@@ -183,9 +190,7 @@
       request({ type: "getSequencer" }),
       request({ type: "getSceneSequencer" }),
     ]);
-    modulators.set(modsRes.modulators || []);
-    if (modsRes.shapes) lfoShapes.set(modsRes.shapes);
-    if (modsRes.easingNames) easingNames.set(modsRes.easingNames);
+    applyModList(modsRes);
     sequencer.set(seqRes);
     sceneSequencer.set(sceneSeqRes);
     if (seqRes.bpm) projectBpm = Math.round(seqRes.bpm);

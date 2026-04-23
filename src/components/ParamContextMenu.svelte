@@ -1,6 +1,6 @@
 <script>
   import { tick } from "svelte";
-  import { selectedSlot } from "../lib/stores.js";
+  import { selectedSlot, modulatorDefaults } from "../lib/stores.js";
   import { send } from "../lib/transport.js";
   import { anchorPoint, clampToViewport } from "../lib/ctxPosition.js";
 
@@ -23,21 +23,11 @@
   function hide() { visible = false; }
 
   function addMod(type) {
-    const base = {
-      min: 0.0, max: 1.0, easing: "linear",
+    const defs = ($modulatorDefaults[type]) || {};
+    send({ type: "createModulator", config: {
+      ...defs, type,
       target: { slot: $selectedSlot, param: targetParam, resource: targetResource },
-    };
-    if (type === "lfo") {
-      send({ type: "createModulator", config: {
-        ...base, type: "lfo", shape: "Sine", frequency: 0.5, phase: 0.0,
-        beatSync: false, beatDivision: 4,
-      }});
-    } else {
-      send({ type: "createModulator", config: {
-        ...base, type: "envelope", attack: 0.1, decay: 0.15, sustain: 0.6,
-        release: 0.3, triggerBeats: 1.0, gateRatio: 0.5,
-      }});
-    }
+    }});
     hide();
   }
 </script>

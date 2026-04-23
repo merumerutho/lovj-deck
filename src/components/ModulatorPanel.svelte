@@ -1,19 +1,10 @@
 <script>
-  import { modulators, lfoShapes, easingNames, schema, selectedSlot, slots, slotShaders, sequencer } from "../lib/stores.js";
+  import { modulators, lfoShapes, easingNames, schema, selectedSlot, slots, slotShaders, sequencer, tempoDivisions, modulatorDefaults, modulatorConstraints } from "../lib/stores.js";
   import { send } from "../lib/transport.js";
 
-  const BEAT_DIVISIONS = [
+  $: BEAT_DIVISIONS = [
     { label: "Free Hz", value: 0 },
-    { label: "16 bars", value: 64 },
-    { label: "8 bars",  value: 32 },
-    { label: "4 bars",  value: 16 },
-    { label: "2 bars",  value: 8 },
-    { label: "1 bar",   value: 4 },
-    { label: "1/2",     value: 2 },
-    { label: "1/4",     value: 1 },
-    { label: "1/8",     value: 0.5 },
-    { label: "1/16",    value: 0.25 },
-    { label: "1/32",    value: 0.125 },
+    ...$tempoDivisions.map((d) => ({ label: d.label, value: d.beats })),
   ];
 
   $: currentBpm = ($sequencer && $sequencer.bpm) ? $sequencer.bpm : 128;
@@ -31,18 +22,11 @@
 
   function addLfo() {
     const p = paramNames[0] || "---";
+    const defs = $modulatorDefaults.lfo || {};
     send({
       type: "createModulator",
       config: {
-        type: "lfo",
-        shape: "Sine",
-        frequency: 0.5,
-        phase: 0.0,
-        beatSync: false,
-        beatDivision: 4,
-        min: 0.0,
-        max: 1.0,
-        easing: "linear",
+        ...defs, type: "lfo",
         target: { slot: $selectedSlot, param: p, resource: targetResource(p) },
       },
     });
@@ -50,19 +34,11 @@
 
   function addEnvelope() {
     const p = paramNames[0] || "---";
+    const defs = $modulatorDefaults.envelope || {};
     send({
       type: "createModulator",
       config: {
-        type: "envelope",
-        attack: 0.1,
-        decay: 0.15,
-        sustain: 0.6,
-        release: 0.3,
-        triggerBeats: 1.0,
-        gateRatio: 0.5,
-        min: 0.0,
-        max: 1.0,
-        easing: "linear",
+        ...defs, type: "envelope",
         target: { slot: $selectedSlot, param: p, resource: targetResource(p) },
       },
     });
@@ -171,39 +147,48 @@
                 {/each}
               </select>
             </label>
+            {@const lc = ($modulatorConstraints.lfo) || {}}
+            {@const ph = lc.phase || { min: 0, max: 1, step: 0.01 }}
             <label>phase
-              <input type="range" min="0" max="1" step="0.01" value={m.phase}
+              <input type="range" min={ph.min} max={ph.max} step={ph.step} value={m.phase}
                 oninput={(e) => updateField(m.id, "phase", e.target.value)} />
               <span class="val">{m.phase.toFixed(2)}</span>
             </label>
           {:else if m.type === "envelope"}
+            {@const ec = ($modulatorConstraints.envelope) || {}}
+            {@const atk = ec.attack || { min: 0.001, max: 2, step: 0.005 }}
+            {@const dec = ec.decay || { min: 0.001, max: 2, step: 0.005 }}
+            {@const sus = ec.sustain || { min: 0, max: 1, step: 0.01 }}
+            {@const rel = ec.release || { min: 0.001, max: 2, step: 0.005 }}
+            {@const tb = ec.triggerBeats || { min: 0.25, max: 8, step: 0.25 }}
+            {@const gr = ec.gateRatio || { min: 0.05, max: 0.95, step: 0.01 }}
             <label>atk
-              <input type="range" min="0.001" max="2" step="0.005" value={m.attack}
+              <input type="range" min={atk.min} max={atk.max} step={atk.step} value={m.attack}
                 oninput={(e) => updateField(m.id, "attack", e.target.value)} />
               <span class="val">{m.attack.toFixed(3)}</span>
             </label>
             <label>dec
-              <input type="range" min="0.001" max="2" step="0.005" value={m.decay}
+              <input type="range" min={dec.min} max={dec.max} step={dec.step} value={m.decay}
                 oninput={(e) => updateField(m.id, "decay", e.target.value)} />
               <span class="val">{m.decay.toFixed(3)}</span>
             </label>
             <label>sus
-              <input type="range" min="0" max="1" step="0.01" value={m.sustain}
+              <input type="range" min={sus.min} max={sus.max} step={sus.step} value={m.sustain}
                 oninput={(e) => updateField(m.id, "sustain", e.target.value)} />
               <span class="val">{m.sustain.toFixed(2)}</span>
             </label>
             <label>rel
-              <input type="range" min="0.001" max="2" step="0.005" value={m.release}
+              <input type="range" min={rel.min} max={rel.max} step={rel.step} value={m.release}
                 oninput={(e) => updateField(m.id, "release", e.target.value)} />
               <span class="val">{m.release.toFixed(3)}</span>
             </label>
             <label>trig beats
-              <input type="range" min="0.25" max="8" step="0.25" value={m.triggerBeats}
+              <input type="range" min={tb.min} max={tb.max} step={tb.step} value={m.triggerBeats}
                 oninput={(e) => updateField(m.id, "triggerBeats", e.target.value)} />
               <span class="val">{m.triggerBeats.toFixed(2)}</span>
             </label>
             <label>gate
-              <input type="range" min="0.05" max="0.95" step="0.01" value={m.gateRatio}
+              <input type="range" min={gr.min} max={gr.max} step={gr.step} value={m.gateRatio}
                 oninput={(e) => updateField(m.id, "gateRatio", e.target.value)} />
               <span class="val">{m.gateRatio.toFixed(2)}</span>
             </label>

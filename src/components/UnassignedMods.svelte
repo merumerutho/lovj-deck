@@ -1,20 +1,11 @@
 <script>
   import { unassignedMods } from "../lib/modulatorsByParam.js";
-  import { lfoShapes, easingNames, sequencer, schema, slotShaders, selectedSlot } from "../lib/stores.js";
+  import { lfoShapes, easingNames, sequencer, schema, slotShaders, selectedSlot, tempoDivisions } from "../lib/stores.js";
   import { send } from "../lib/transport.js";
 
-  const BEAT_DIVISIONS = [
+  $: BEAT_DIVISIONS = [
     { label: "Free Hz", value: 0 },
-    { label: "16 bars", value: 64 },
-    { label: "8 bars",  value: 32 },
-    { label: "4 bars",  value: 16 },
-    { label: "2 bars",  value: 8 },
-    { label: "1 bar",   value: 4 },
-    { label: "1/2",     value: 2 },
-    { label: "1/4",     value: 1 },
-    { label: "1/8",     value: 0.5 },
-    { label: "1/16",    value: 0.25 },
-    { label: "1/32",    value: 0.125 },
+    ...$tempoDivisions.map((d) => ({ label: d.label, value: d.beats })),
   ];
 
   $: mods = $unassignedMods;

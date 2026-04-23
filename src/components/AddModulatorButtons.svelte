@@ -1,5 +1,5 @@
 <script>
-  import { schema, selectedSlot, slotShaders } from "../lib/stores.js";
+  import { schema, selectedSlot, slotShaders, modulatorDefaults } from "../lib/stores.js";
   import { send } from "../lib/transport.js";
 
   $: paramNames = ($schema && $schema.params) ? $schema.params.map((p) => p.name) : [];
@@ -17,11 +17,11 @@
 
   function addLfo() {
     const p = firstParam();
+    const defs = $modulatorDefaults.lfo || {};
     send({
       type: "createModulator",
       config: {
-        type: "lfo", shape: "Sine", frequency: 0.5, phase: 0.0,
-        beatSync: false, beatDivision: 4, min: 0.0, max: 1.0, easing: "linear",
+        ...defs, type: "lfo",
         target: { slot: $selectedSlot, param: p, resource: targetResource(p) },
       },
     });
@@ -29,11 +29,11 @@
 
   function addEnvelope() {
     const p = firstParam();
+    const defs = $modulatorDefaults.envelope || {};
     send({
       type: "createModulator",
       config: {
-        type: "envelope", attack: 0.1, decay: 0.15, sustain: 0.6, release: 0.3,
-        triggerBeats: 1.0, gateRatio: 0.5, min: 0.0, max: 1.0, easing: "linear",
+        ...defs, type: "envelope",
         target: { slot: $selectedSlot, param: p, resource: targetResource(p) },
       },
     });

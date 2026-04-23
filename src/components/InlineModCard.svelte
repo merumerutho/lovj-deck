@@ -1,7 +1,12 @@
 <script>
   import { modulatorsByTarget } from "../lib/modulatorsByParam.js";
-  import { lfoShapes, easingNames, sequencer, schema, slotShaders, selectedSlot } from "../lib/stores.js";
+  import { lfoShapes, easingNames, sequencer, schema, slotShaders, selectedSlot, tempoDivisions, modulatorConstraints } from "../lib/stores.js";
   import { send } from "../lib/transport.js";
+
+  $: BEAT_DIVISIONS = [
+    { label: "Free Hz", value: 0 },
+    ...$tempoDivisions.map((d) => ({ label: d.label, value: d.beats })),
+  ];
 
   export let paramName = "";
   export let resource = "parameters";
@@ -15,20 +20,6 @@
     const res = shaderParamNames.includes(newParam) ? "shaderext" : "parameters";
     send({ type: "updateModulator", modulatorId: id, changes: { target: { param: newParam, resource: res } } });
   }
-
-  const BEAT_DIVISIONS = [
-    { label: "Free Hz", value: 0 },
-    { label: "16 bars", value: 64 },
-    { label: "8 bars",  value: 32 },
-    { label: "4 bars",  value: 16 },
-    { label: "2 bars",  value: 8 },
-    { label: "1 bar",   value: 4 },
-    { label: "1/2",     value: 2 },
-    { label: "1/4",     value: 1 },
-    { label: "1/8",     value: 0.5 },
-    { label: "1/16",    value: 0.25 },
-    { label: "1/32",    value: 0.125 },
-  ];
 
   $: key = resource + ":" + paramName;
   $: mods = $modulatorsByTarget.get(key) || [];
@@ -102,6 +93,8 @@
           </select>
         </div>
         {#if m.type === "lfo"}
+          {@const lc = ($modulatorConstraints.lfo) || {}}
+          {@const ph = lc.phase || { min: 0, max: 1, step: 0.01 }}
           <div class="imod-grid">
             <label>shape
               <select value={m.shape} onchange={(e) => updateField(m.id, "shape", e.target.value)}>
@@ -120,23 +113,30 @@
               </select>
             </label>
             <label>phase
-              <input type="range" min="0" max="1" step="0.01" value={m.phase}
+              <input type="range" min={ph.min} max={ph.max} step={ph.step} value={m.phase}
                 oninput={(e) => updateField(m.id, "phase", e.target.value)} />
             </label>
           </div>
         {:else if m.type === "envelope"}
+          {@const ec = ($modulatorConstraints.envelope) || {}}
+          {@const atk = ec.attack || { min: 0.001, max: 2, step: 0.005 }}
+          {@const dec = ec.decay || { min: 0.001, max: 2, step: 0.005 }}
+          {@const sus = ec.sustain || { min: 0, max: 1, step: 0.01 }}
+          {@const rel = ec.release || { min: 0.001, max: 2, step: 0.005 }}
+          {@const tb = ec.triggerBeats || { min: 0.25, max: 8, step: 0.25 }}
+          {@const gr = ec.gateRatio || { min: 0.05, max: 0.95, step: 0.01 }}
           <div class="imod-grid">
-            <label>atk <input type="range" min="0.001" max="2" step="0.005" value={m.attack}
+            <label>atk <input type="range" min={atk.min} max={atk.max} step={atk.step} value={m.attack}
               oninput={(e) => updateField(m.id, "attack", e.target.value)} /></label>
-            <label>dec <input type="range" min="0.001" max="2" step="0.005" value={m.decay}
+            <label>dec <input type="range" min={dec.min} max={dec.max} step={dec.step} value={m.decay}
               oninput={(e) => updateField(m.id, "decay", e.target.value)} /></label>
-            <label>sus <input type="range" min="0" max="1" step="0.01" value={m.sustain}
+            <label>sus <input type="range" min={sus.min} max={sus.max} step={sus.step} value={m.sustain}
               oninput={(e) => updateField(m.id, "sustain", e.target.value)} /></label>
-            <label>rel <input type="range" min="0.001" max="2" step="0.005" value={m.release}
+            <label>rel <input type="range" min={rel.min} max={rel.max} step={rel.step} value={m.release}
               oninput={(e) => updateField(m.id, "release", e.target.value)} /></label>
-            <label>trig <input type="range" min="0.25" max="8" step="0.25" value={m.triggerBeats}
+            <label>trig <input type="range" min={tb.min} max={tb.max} step={tb.step} value={m.triggerBeats}
               oninput={(e) => updateField(m.id, "triggerBeats", e.target.value)} /></label>
-            <label>gate <input type="range" min="0.05" max="0.95" step="0.01" value={m.gateRatio}
+            <label>gate <input type="range" min={gr.min} max={gr.max} step={gr.step} value={m.gateRatio}
               oninput={(e) => updateField(m.id, "gateRatio", e.target.value)} /></label>
           </div>
         {/if}

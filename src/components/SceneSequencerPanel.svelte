@@ -1,6 +1,11 @@
 <script>
-  import { sceneSequencer, selectedSlot, schema, availablePatches, savestateList } from "../lib/stores.js";
+  import { sceneSequencer, selectedSlot, schema, availablePatches, savestateList, tempoDivisions } from "../lib/stores.js";
   import { send } from "../lib/transport.js";
+
+  $: DIVIDER_OPTIONS = $tempoDivisions
+    .filter((d) => d.beats <= 4)
+    .map((d) => ({ label: d.label, value: 1 / d.beats }))
+    .sort((a, b) => a.value - b.value);
 
   $: scenes   = ($sceneSequencer && $sceneSequencer.scenes) || [];
   $: channels = ($sceneSequencer && $sceneSequencer.channels) || [];
@@ -99,13 +104,7 @@
 
   function patchShort(path) { return path ? path.replace(/.*\//, "") : "?"; }
 
-  const DIVIDER_OPTIONS = [
-    { label: "1/1 bar", value: 0.25 },
-    { label: "1/2 bar", value: 0.5 },
-    { label: "1 beat",  value: 1 },
-    { label: "2 beats", value: 2 },
-    { label: "4 beats", value: 4 },
-  ];
+  function resync() { send({ type: "resyncPhases" }); }
 </script>
 
 <div class="ssp">
@@ -114,6 +113,7 @@
     <button class="tbtn" class:active={playing} onclick={playing ? stop : play}>
       {playing ? "Stop" : "Play"}
     </button>
+    <button class="tbtn" onclick={resync}>RESYNC</button>
   </div>
 
   <!-- Scene bank -->
@@ -219,6 +219,12 @@
               {/each}
             </select>
           </span>
+          <label class="phase-ctl">
+            phase
+            <input type="range" min="0" max="1" step="0.01" value={ch.phase || 0}
+              oninput={(e) => updateChannel(ch.name, "phase", e.target.value)} />
+            <span class="phase-val">{((ch.phase || 0) * 100).toFixed(0)}%</span>
+          </label>
           <button class="ch-del" onclick={() => removeChannel(ch.name)} title="Remove">&#10005;</button>
         </div>
         <div class="step-row">
@@ -340,6 +346,12 @@
     cursor: pointer; font-size: 0.8rem; padding: 0;
   }
   .ch-del:hover { color: #c88; }
+  .phase-ctl {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 0.72rem; color: #888;
+  }
+  .phase-ctl input[type="range"] { width: 60px; accent-color: #c9a24a; cursor: pointer; }
+  .phase-val { color: #666; font-size: 0.72rem; min-width: 28px; }
 
   .step-row { display: flex; gap: 2px; flex-wrap: wrap; }
   .step-cell {
