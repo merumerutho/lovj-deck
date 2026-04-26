@@ -6,6 +6,7 @@
     sequencer, sceneSequencer, availablePatches, slotShaders, savestateList,
     liveValues, liveShaderValues, beatPhase, seqSteps, tempoDivisions,
     modulatorDefaults, modulatorConstraints,
+    midiMappings, midiLearnState, midiDevices, midiActivity,
   } from "./lib/stores.js";
   import AppHeader from "./components/AppHeader.svelte";
   import SlotSelector from "./components/SlotSelector.svelte";
@@ -15,6 +16,7 @@
   import SequencerPanel from "./components/SequencerPanel.svelte";
   import SceneSequencerPanel from "./components/SceneSequencerPanel.svelte";
   import UnassignedMods from "./components/UnassignedMods.svelte";
+  import MidiPanel from "./components/MidiPanel.svelte";
 
   let activeTab = "params";
 
@@ -207,6 +209,22 @@
     }
   });
 
+  on("midiMappings", (msg) => {
+    midiMappings.set(msg.mappings || []);
+  });
+
+  on("midiLearnCaptured", (msg) => {
+    midiLearnState.set(null);
+  });
+
+  on("midiLearnCancelled", () => {
+    midiLearnState.set(null);
+  });
+
+  on("midiActivity", (msg) => {
+    midiActivity.set(msg);
+  });
+
   onMount(() => { connect(); });
 </script>
 
@@ -236,6 +254,13 @@
             <span class="tab-st amber">● {$sceneSequencer.channels.length}ch</span>
           {/if}
         </button>
+        <button class="tab" class:active={activeTab === "midi"}
+          onclick={() => activeTab = "midi"}>
+          MIDI
+          {#if $midiMappings.length > 0}
+            <span class="tab-st blue">● {$midiMappings.length}</span>
+          {/if}
+        </button>
       </div>
 
       {#if activeTab === "params"}
@@ -255,6 +280,10 @@
       {:else if activeTab === "scenes"}
         <div class="tab-fill">
           <SceneSequencerPanel />
+        </div>
+      {:else if activeTab === "midi"}
+        <div class="tab-fill">
+          <MidiPanel />
         </div>
       {/if}
     </div>
@@ -314,6 +343,7 @@
   .tab-st { font-size: 9px; margin-left: 4px; }
   .tab-st.green { color: #5a9a6a; }
   .tab-st.amber { color: #c9a24a; }
+  .tab-st.blue { color: #5a7aaa; }
 
   .main-scroll {
     flex: 1;

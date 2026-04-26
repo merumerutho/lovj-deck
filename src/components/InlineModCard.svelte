@@ -1,7 +1,17 @@
 <script>
   import { modulatorsByTarget } from "../lib/modulatorsByParam.js";
-  import { lfoShapes, easingNames, sequencer, schema, slotShaders, selectedSlot, tempoDivisions, modulatorConstraints } from "../lib/stores.js";
+  import { lfoShapes, easingNames, sequencer, schema, slotShaders, selectedSlot, tempoDivisions, modulatorConstraints, midiLearnState } from "../lib/stores.js";
   import { send } from "../lib/transport.js";
+
+  function startMidiLearnMod(modulatorId, field) {
+    midiLearnState.set({ active: true, targetType: "modulator", modulatorId, modulatorField: field });
+    send({ type: "startMidiLearnModulator", modulatorId, field });
+  }
+
+  function isLearning(modulatorId, field) {
+    const s = $midiLearnState;
+    return s && s.targetType === "modulator" && s.modulatorId === modulatorId && s.modulatorField === field;
+  }
 
   $: BEAT_DIVISIONS = [
     { label: "Free Hz", value: 0 },
@@ -105,6 +115,8 @@
               <input type="number" step="any" value={m.frequency} class="num-in"
                 disabled={m.beatSync}
                 onchange={(e) => updateField(m.id, "frequency", e.target.value)} />
+              <button class="midi-learn-btn" class:learning={isLearning(m.id, "frequency")}
+                onclick={() => startMidiLearnMod(m.id, "frequency")} title="MIDI Learn">M</button>
             </label>
             <label>sync
               <select value={m.beatSync ? m.beatDivision : 0}
@@ -115,6 +127,8 @@
             <label>phase
               <input type="range" min={ph.min} max={ph.max} step={ph.step} value={m.phase}
                 oninput={(e) => updateField(m.id, "phase", e.target.value)} />
+              <button class="midi-learn-btn" class:learning={isLearning(m.id, "phase")}
+                onclick={() => startMidiLearnMod(m.id, "phase")} title="MIDI Learn">M</button>
             </label>
           </div>
         {:else if m.type === "envelope"}
@@ -127,13 +141,21 @@
           {@const gr = ec.gateRatio || { min: 0.05, max: 0.95, step: 0.01 }}
           <div class="imod-grid">
             <label>atk <input type="range" min={atk.min} max={atk.max} step={atk.step} value={m.attack}
-              oninput={(e) => updateField(m.id, "attack", e.target.value)} /></label>
+              oninput={(e) => updateField(m.id, "attack", e.target.value)} />
+              <button class="midi-learn-btn" class:learning={isLearning(m.id, "attack")}
+                onclick={() => startMidiLearnMod(m.id, "attack")} title="MIDI Learn">M</button></label>
             <label>dec <input type="range" min={dec.min} max={dec.max} step={dec.step} value={m.decay}
-              oninput={(e) => updateField(m.id, "decay", e.target.value)} /></label>
+              oninput={(e) => updateField(m.id, "decay", e.target.value)} />
+              <button class="midi-learn-btn" class:learning={isLearning(m.id, "decay")}
+                onclick={() => startMidiLearnMod(m.id, "decay")} title="MIDI Learn">M</button></label>
             <label>sus <input type="range" min={sus.min} max={sus.max} step={sus.step} value={m.sustain}
-              oninput={(e) => updateField(m.id, "sustain", e.target.value)} /></label>
+              oninput={(e) => updateField(m.id, "sustain", e.target.value)} />
+              <button class="midi-learn-btn" class:learning={isLearning(m.id, "sustain")}
+                onclick={() => startMidiLearnMod(m.id, "sustain")} title="MIDI Learn">M</button></label>
             <label>rel <input type="range" min={rel.min} max={rel.max} step={rel.step} value={m.release}
-              oninput={(e) => updateField(m.id, "release", e.target.value)} /></label>
+              oninput={(e) => updateField(m.id, "release", e.target.value)} />
+              <button class="midi-learn-btn" class:learning={isLearning(m.id, "release")}
+                onclick={() => startMidiLearnMod(m.id, "release")} title="MIDI Learn">M</button></label>
             <label>trig <input type="range" min={tb.min} max={tb.max} step={tb.step} value={m.triggerBeats}
               oninput={(e) => updateField(m.id, "triggerBeats", e.target.value)} /></label>
             <label>gate <input type="range" min={gr.min} max={gr.max} step={gr.step} value={m.gateRatio}
@@ -142,9 +164,13 @@
         {/if}
         <div class="imod-grid imod-common">
           <label>min <input type="number" step="any" value={m.min} class="num-in"
-            onchange={(e) => updateField(m.id, "min", e.target.value)} /></label>
+            onchange={(e) => updateField(m.id, "min", e.target.value)} />
+            <button class="midi-learn-btn" class:learning={isLearning(m.id, "min")}
+              onclick={() => startMidiLearnMod(m.id, "min")} title="MIDI Learn">M</button></label>
           <label>max <input type="number" step="any" value={m.max} class="num-in"
-            onchange={(e) => updateField(m.id, "max", e.target.value)} /></label>
+            onchange={(e) => updateField(m.id, "max", e.target.value)} />
+            <button class="midi-learn-btn" class:learning={isLearning(m.id, "max")}
+              onclick={() => startMidiLearnMod(m.id, "max")} title="MIDI Learn">M</button></label>
           <label>curve
             <select value={m.easing || "linear"} onchange={(e) => updateField(m.id, "easing", e.target.value)}>
               {#each $easingNames as name}<option value={name}>{name}</option>{/each}
@@ -216,4 +242,19 @@
   }
   .num-in:disabled { color: #555; }
   .imod-common { margin-top: 3px; padding-top: 3px; border-top: 1px dashed rgba(138,106,170,.3); }
+  .midi-learn-btn {
+    width: 16px; height: 14px; flex-shrink: 0;
+    font-family: ui-monospace, monospace; font-size: 7px; font-weight: bold;
+    background: none; border: 1px solid #444; color: #666;
+    cursor: pointer; padding: 0; line-height: 1;
+  }
+  .midi-learn-btn:hover { border-color: #5a7aaa; color: #5a7aaa; }
+  .midi-learn-btn.learning {
+    border-color: #c9a24a; color: #c9a24a;
+    animation: pulse 1s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
 </style>

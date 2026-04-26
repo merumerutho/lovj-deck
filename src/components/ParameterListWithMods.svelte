@@ -1,8 +1,13 @@
 <script>
-  import { schema, selectedSlot, liveValues } from "../lib/stores.js";
+  import { schema, selectedSlot, liveValues, midiLearnState } from "../lib/stores.js";
   import { send } from "../lib/transport.js";
   import InlineModCard from "./InlineModCard.svelte";
   import ParamContextMenu from "./ParamContextMenu.svelte";
+
+  function startMidiLearn(paramName) {
+    midiLearnState.set({ active: true, slot: $selectedSlot, paramName });
+    send({ type: "startMidiLearn", slot: $selectedSlot, paramName });
+  }
 
   let ctxMenu;
 
@@ -67,6 +72,12 @@
         <span class="param-value" class:live-value={hasLive}>
           {hasLive ? fmtValue(live, p) : fmtValue(p.value, p)}
         </span>
+        <button
+          class="midi-learn-btn"
+          class:learning={$midiLearnState && $midiLearnState.paramName === p.name && $midiLearnState.slot === $selectedSlot}
+          title="MIDI Learn"
+          onclick={() => startMidiLearn(p.name)}
+        >M</button>
       </div>
       {#if p.modulated}
         <InlineModCard paramName={p.name} resource="parameters" />
@@ -110,5 +121,20 @@
   }
   .param-value.live-value { color: #a88adc; }
   .param-row.modulated .param-value { color: #a88adc; }
+  .midi-learn-btn {
+    width: 18px; height: 16px; flex-shrink: 0;
+    font-family: ui-monospace, monospace; font-size: 8px; font-weight: bold;
+    background: none; border: 1px solid #444; color: #666;
+    cursor: pointer; padding: 0; line-height: 1;
+  }
+  .midi-learn-btn:hover { border-color: #5a7aaa; color: #5a7aaa; }
+  .midi-learn-btn.learning {
+    border-color: #c9a24a; color: #c9a24a;
+    animation: pulse 1s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
   .empty { color: #555; font-size: 11px; text-align: center; padding: 1rem 0; }
 </style>

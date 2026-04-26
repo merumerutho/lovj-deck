@@ -60,3 +60,15 @@ export const modulatorDefaults = writable({});
 
 /** Per-field range constraints per modulator type from backend: { lfo: {...}, envelope: {...} }. */
 export const modulatorConstraints = writable({});
+
+/** MIDI mapping list from backend. */
+export const midiMappings = writable([]);
+
+/** MIDI learn state: {active, slot, paramName} or null. */
+export const midiLearnState = writable(null);
+
+/** Connected MIDI devices from backend. */
+export const midiDevices = writable([]);
+
+/** Latest MIDI activity message for monitor display. */
+export const midiActivity = writable(null);
